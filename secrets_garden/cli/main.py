@@ -12,9 +12,6 @@ from typing import List, Optional
 import typer
 from rich import print as rprint
 from rich.console import Console
-from rich.prompt import Confirm, Prompt
-from rich.table import Table
-from rich.text import Text
 
 from secrets_garden import __version__
 from secrets_garden.cli.commands import (
@@ -28,13 +25,13 @@ from secrets_garden.cli.commands import (
     info_command,
     list_secrets_command,
     lock_vault_command,
+    rotate_key_command,
     run_command,
     unlock_vault_command,
     update_secret_command,
 )
 from secrets_garden.config.settings import get_config
 from secrets_garden.exceptions import SecretsGardenError
-
 
 # Create Typer app
 app = typer.Typer(
@@ -58,8 +55,8 @@ def version_callback(value: bool) -> None:
 @app.callback()
 def main(
     version: Optional[bool] = typer.Option(
-        None, 
-        "--version", 
+        None,
+        "--version",
         "-v",
         callback=version_callback,
         is_eager=True,
@@ -68,7 +65,7 @@ def main(
     vault: Optional[str] = typer.Option(
         None,
         "--vault",
-        "-V", 
+        "-V",
         help="Vault name to use (defaults to 'default')"
     ),
     config_dir: Optional[Path] = typer.Option(
@@ -82,7 +79,7 @@ def main(
         help="Enable verbose output"
     ),
     quiet: bool = typer.Option(
-        False, 
+        False,
         "--quiet",
         "-q",
         help="Suppress non-essential output"
@@ -94,20 +91,20 @@ def main(
     A command-line tool for managing secrets with military-grade encryption.
     All data is stored locally with AES-256-GCM encryption.
     """
-    
+
     # Initialize configuration
     config = get_config()
-    
+
     # Update runtime settings
     if config_dir:
         config.config_dir = config_dir
-    
+
     if verbose:
         config.settings.cli.verbose = True
-    
+
     if quiet:
         config.settings.cli.quiet = True
-    
+
     # Set default vault if specified
     if vault:
         config.settings.vault.default_vault_name = vault
@@ -147,7 +144,7 @@ def unlock_vault(
     password: Optional[str] = typer.Option(
         None,
         "--password",
-        "-p", 
+        "-p",
         help="Master password (will prompt if not provided)",
         hidden=True,
     ),
@@ -191,7 +188,7 @@ def add_secret(
     ),
     description: Optional[str] = typer.Option(
         None,
-        "--description", 
+        "--description",
         "-d",
         help="Secret description"
     ),
@@ -279,7 +276,7 @@ def update_secret(
     description: Optional[str] = typer.Option(
         None,
         "--description",
-        "-d", 
+        "-d",
         help="New description"
     ),
     tags: Optional[List[str]] = typer.Option(
@@ -298,7 +295,7 @@ def update_secret(
     update_secret_command(name, value, description, tags, vault_name)
 
 
-@app.command("delete") 
+@app.command("delete")
 def delete_secret(
     name: str = typer.Argument(..., help="Secret name"),
     vault_name: Optional[str] = typer.Option(
@@ -334,7 +331,7 @@ def export_secrets(
     ),
     vault_name: Optional[str] = typer.Option(
         None,
-        "--vault", 
+        "--vault",
         help="Vault name"
     ),
 ) -> None:
@@ -389,12 +386,35 @@ def change_password(
     new_password: Optional[str] = typer.Option(
         None,
         "--new-password",
-        help="New password", 
+        help="New password",
         hidden=True,
     ),
 ) -> None:
     """Change the vault master password."""
     change_password_command(vault_name, old_password, new_password)
+
+
+@app.command("rotate-key")
+def rotate_key(
+    vault_name: Optional[str] = typer.Option(
+        None,
+        "--vault",
+        help="Vault name"
+    ),
+    password: Optional[str] = typer.Option(
+        None,
+        "--password",
+        help="Current password",
+        hidden=True,
+    ),
+    no_backup: bool = typer.Option(
+        False,
+        "--no-backup",
+        help="Skip creating backup before rotation"
+    ),
+) -> None:
+    """Rotate the vault's encryption keys for enhanced security."""
+    rotate_key_command(vault_name, password, not no_backup)
 
 
 def handle_error(error: Exception) -> None:

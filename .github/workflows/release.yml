@@ -1,0 +1,221 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'  # Trigger on version tags like v1.0.0, v1.2.3, etc.
+
+permissions:
+  contents: write  # Required for creating releases
+  id-token: write  # Required for PyPI trusted publishing
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: "3.11"
+
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -e ".[dev]"
+
+    - name: Run tests
+      run: |
+        pytest --cov=secrets_garden --cov-report=xml
+
+    - name: Run security checks
+      run: |
+        bandit -r secrets_garden
+        ruff check secrets_garden tests
+
+  build:
+    needs: test
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: "3.11"
+
+    - name: Install build dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install build twine
+
+    - name: Extract version from tag
+      id: version
+      run: |
+        echo "VERSION=${GITHUB_REF#refs/tags/v}" >> $GITHUB_OUTPUT
+        echo "TAG=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
+
+    - name: Update version in pyproject.toml
+      run: |
+        sed -i 's/version = ".*"/version = "${{ steps.version.outputs.VERSION }}"/' pyproject.toml
+
+    - name: Build package
+      run: |
+        python -m build
+
+    - name: Check package
+      run: |
+        twine check dist/*
+
+    - name: Upload build artifacts
+      uses: actions/upload-artifact@v3
+      with:
+        name: dist-${{ steps.version.outputs.VERSION }}
+        path: dist/
+
+  release:
+    needs: [test, build]
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        fetch-depth: 0  # Fetch full history for changelog generation
+
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: "3.11"
+
+    - name: Download build artifacts
+      uses: actions/download-artifact@v3
+      with:
+        name: dist-${{ needs.build.outputs.version }}
+        path: dist/
+
+    - name: Extract version from tag
+      id: version
+      run: |
+        echo "VERSION=${GITHUB_REF#refs/tags/v}" >> $GITHUB_OUTPUT
+        echo "TAG=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
+
+    - name: Extract changelog for this version
+      id: changelog
+      run: |
+        # Extract changelog section for this version
+        awk "/^## \[${{ steps.version.outputs.VERSION }}\]/{flag=1; next} /^## \[/{flag=0} flag" CHANGELOG.md > current_changelog.md
+        
+        # If changelog is empty, create a basic one
+        if [ ! -s current_changelog.md ]; then
+          echo "### Changes" > current_changelog.md
+          echo "See [CHANGELOG.md](CHANGELOG.md) for detailed changes." >> current_changelog.md
+        fi
+
+    - name: Create GitHub Release
+      uses: actions/create-release@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        tag_name: ${{ steps.version.outputs.TAG }}
+        release_name: Secret's Garden ${{ steps.version.outputs.VERSION }}
+        body_path: current_changelog.md
+        draft: false
+        prerelease: ${{ contains(steps.version.outputs.VERSION, '-') }}
+
+    - name: Upload Release Assets
+      uses: actions/upload-release-asset@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        upload_url: ${{ steps.create_release.outputs.upload_url }}
+        asset_path: dist/secrets_garden-${{ steps.version.outputs.VERSION }}-py3-none-any.whl
+        asset_name: secrets_garden-${{ steps.version.outputs.VERSION }}-py3-none-any.whl
+        asset_content_type: application/zip
+
+    - name: Upload Source Distribution
+      uses: actions/upload-release-asset@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        upload_url: ${{ steps.create_release.outputs.upload_url }}
+        asset_path: dist/secrets-garden-${{ steps.version.outputs.VERSION }}.tar.gz
+        asset_name: secrets-garden-${{ steps.version.outputs.VERSION }}.tar.gz
+        asset_content_type: application/gzip
+
+  publish-pypi:
+    needs: [test, build, release]
+    runs-on: ubuntu-latest
+    environment:
+      name: pypi
+      url: https://pypi.org/p/secrets-garden
+    steps:
+    - name: Download build artifacts
+      uses: actions/download-artifact@v3
+      with:
+        name: dist-${{ needs.build.outputs.version }}
+        path: dist/
+
+    - name: Publish to PyPI
+      uses: pypa/gh-action-pypi-publish@release/v1
+      with:
+        # Using trusted publishing (no API token needed if configured)
+        # Alternative: use api-token: ${{ secrets.PYPI_API_TOKEN }}
+        verbose: true
+        print-hash: true
+
+  publish-test-pypi:
+    needs: [test, build]
+    runs-on: ubuntu-latest
+    if: contains(github.ref, '-')  # Only for pre-release tags
+    environment:
+      name: testpypi
+      url: https://test.pypi.org/p/secrets-garden
+    steps:
+    - name: Download build artifacts
+      uses: actions/download-artifact@v3
+      with:
+        name: dist-${{ needs.build.outputs.version }}
+        path: dist/
+
+    - name: Publish to Test PyPI
+      uses: pypa/gh-action-pypi-publish@release/v1
+      with:
+        repository-url: https://test.pypi.org/legacy/
+        verbose: true
+        print-hash: true
+
+  post-release:
+    needs: [publish-pypi]
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        token: ${{ secrets.GITHUB_TOKEN }}
+
+    - name: Extract version from tag
+      id: version
+      run: |
+        echo "VERSION=${GITHUB_REF#refs/tags/v}" >> $GITHUB_OUTPUT
+
+    - name: Update README badges
+      run: |
+        # Update PyPI version badge
+        sed -i 's/python-3\.[0-9]\+-blue/python-3.9+-blue/' README.md
+        
+        # Add PyPI version badge if not present
+        if ! grep -q "pypi.org/project/secrets-garden" README.md; then
+          sed -i '/\[!\[License: MIT\]/a [![PyPI version](https://badge.fury.io/py/secrets-garden.svg)](https://badge.fury.io/py/secrets-garden)' README.md
+        fi
+
+    - name: Commit and push changes
+      run: |
+        git config --local user.email "action@github.com"
+        git config --local user.name "GitHub Action"
+        
+        if git diff --quiet; then
+          echo "No changes to commit"
+        else
+          git add README.md
+          git commit -m "chore: update badges for release ${{ steps.version.outputs.VERSION }}"
+          git push
+        fi

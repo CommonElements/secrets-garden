@@ -5,13 +5,10 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="05662cf3-b0ea-42a3-8cb1-25c01dc4dfc2" name="Changes" comment="">
-      <change afterPath="$PROJECT_DIR$/.idea/SecretsGarden.iml" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/.idea/inspectionProfiles/profiles_settings.xml" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/.idea/misc.xml" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/.idea/modules.xml" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/.idea/vcs.xml" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/main.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/pyproject.toml" beforeDir="false" afterPath="$PROJECT_DIR$/pyproject.toml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/secrets_garden/cli/commands.py" beforeDir="false" afterPath="$PROJECT_DIR$/secrets_garden/cli/commands.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/secrets_garden/vault/manager.py" beforeDir="false" afterPath="$PROJECT_DIR$/secrets_garden/vault/manager.py" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -63,7 +60,7 @@
       <option name="number" value="Default" />
       <option name="presentableId" value="Default" />
       <updated>1753878549403</updated>
-      <workItem from="1753878550441" duration="8560000" />
+      <workItem from="1753878550441" duration="11956000" />
     </task>
     <servers />
   </component>

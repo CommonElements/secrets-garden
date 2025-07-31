@@ -10,7 +10,10 @@ readme = "README.md"
 requires-python = ">=3.9"
 license = {text = "MIT"}
 authors = [
-    {name = "Harry Schoeller", email = "harry@example.com"},
+    {name = "Harry Schoeller", email = "harry@schoeller.dev"},
+]
+maintainers = [
+    {name = "Harry Schoeller", email = "harry@schoeller.dev"},
 ]
 keywords = [
     "secrets",
@@ -22,6 +25,7 @@ keywords = [
 ]
 classifiers = [
     "Development Status :: 4 - Beta",
+    "Natural Language :: English",
     "Environment :: Console",
     "Intended Audience :: Developers",
     "License :: OSI Approved :: MIT License",
@@ -65,15 +69,27 @@ docs = [
     "mkdocs-click>=0.8.0,<1.0.0",
     "mkdocstrings[python]>=0.24.0,<1.0.0",
 ]
+release = [
+    "build>=1.0.0",
+    "twine>=4.0.0",
+    "bump2version>=1.0.0",
+]
+all = [
+    "secrets-garden[dev,docs,release]",
+]
 
 [project.scripts]
 secrets-garden = "secrets_garden.cli.main:app"
 
 [project.urls]
-Homepage = "https://github.com/harryschoeller/secrets-garden"
-Documentation = "https://github.com/harryschoeller/secrets-garden#readme"
-Repository = "https://github.com/harryschoeller/secrets-garden"
-"Bug Tracker" = "https://github.com/harryschoeller/secrets-garden/issues"
+Homepage = "https://github.com/CommonElements/secrets-garden"
+Documentation = "https://github.com/CommonElements/secrets-garden#readme"
+Repository = "https://github.com/CommonElements/secrets-garden"
+"Bug Tracker" = "https://github.com/CommonElements/secrets-garden/issues"
+Changelog = "https://github.com/CommonElements/secrets-garden/blob/main/CHANGELOG.md"
+"Source Code" = "https://github.com/CommonElements/secrets-garden"
+"Security Policy" = "https://github.com/CommonElements/secrets-garden/security/policy"
+Discussions = "https://github.com/CommonElements/secrets-garden/discussions"
 
 [tool.hatch.build.targets.wheel]
 packages = ["secrets_garden"]
@@ -102,6 +118,8 @@ extend-exclude = '''
 [tool.ruff]
 target-version = "py39"
 line-length = 88
+
+[tool.ruff.lint]
 select = [
     "E",   # pycodestyle errors
     "W",   # pycodestyle warnings
@@ -120,7 +138,7 @@ ignore = [
     "S101",  # use of assert detected (pytest uses assert)
 ]
 
-[tool.ruff.per-file-ignores]
+[tool.ruff.lint.per-file-ignores]
 "tests/**/*" = ["S101", "ARG001", "ARG002"]
 
 [tool.mypy]

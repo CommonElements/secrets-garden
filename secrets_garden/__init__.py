@@ -10,18 +10,18 @@ __author__ = "Harry Schoeller"
 __email__ = "harry@example.com"
 
 from secrets_garden.exceptions import (
-    SecretsGardenError,
-    VaultError,
     CryptoError,
     DatabaseError,
+    SecretsGardenError,
+    VaultError,
 )
 
 __all__ = [
     "__version__",
-    "__author__", 
+    "__author__",
     "__email__",
     "SecretsGardenError",
-    "VaultError", 
+    "VaultError",
     "CryptoError",
     "DatabaseError",
 ]

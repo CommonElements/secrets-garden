@@ -15,9 +15,10 @@ Security Features:
 
 import sqlite3
 import time
+from collections.abc import Generator
 from contextlib import contextmanager
 from pathlib import Path
-from typing import Any, Dict, Generator, List, Optional, Tuple, Union
+from typing import Any, Dict, List, Optional, Union
 
 from secrets_garden.exceptions import (
     DatabaseError,
@@ -30,7 +31,7 @@ from secrets_garden.vault.crypto import EncryptedData
 
 class SecretRecord:
     """Represents a secret stored in the database."""
-    
+
     def __init__(
         self,
         name: str,
@@ -46,7 +47,7 @@ class SecretRecord:
         self.tags = tags
         self.created_at = created_at or time.time()
         self.updated_at = updated_at or time.time()
-    
+
     def to_dict(self) -> Dict[str, Any]:
         """Convert the record to a dictionary."""
         return {
@@ -66,10 +67,10 @@ class DatabaseManager:
     handling schema creation, migrations, and CRUD operations
     for encrypted secrets.
     """
-    
+
     # Database schema version for migrations
     SCHEMA_VERSION = 1
-    
+
     def __init__(self, db_path: Path) -> None:
         """
         Initialize the database manager.
@@ -79,7 +80,7 @@ class DatabaseManager:
         """
         self.db_path = db_path
         self._connection: Optional[sqlite3.Connection] = None
-    
+
     def connect(self) -> None:
         """
         Connect to the SQLite database.
@@ -93,25 +94,25 @@ class DatabaseManager:
                 check_same_thread=False,
                 timeout=30.0,
             )
-            
+
             # Configure SQLite for security and performance
             self._connection.execute("PRAGMA journal_mode=WAL")
             self._connection.execute("PRAGMA synchronous=FULL")
             self._connection.execute("PRAGMA foreign_keys=ON")
             self._connection.execute("PRAGMA secure_delete=ON")
-            
+
             # Set row factory for easier data access
             self._connection.row_factory = sqlite3.Row
-            
+
         except sqlite3.Error as e:
             raise DatabaseError(f"Failed to connect to database: {e}") from e
-    
+
     def disconnect(self) -> None:
         """Close the database connection."""
         if self._connection:
             self._connection.close()
             self._connection = None
-    
+
     @contextmanager
     def transaction(self) -> Generator[sqlite3.Connection, None, None]:
         """
@@ -128,7 +129,7 @@ class DatabaseManager:
         """
         if not self._connection:
             raise DatabaseError("Database not connected")
-        
+
         try:
             self._connection.execute("BEGIN")
             yield self._connection
@@ -136,7 +137,7 @@ class DatabaseManager:
         except Exception as e:
             self._connection.rollback()
             raise DatabaseError(f"Transaction failed: {e}") from e
-    
+
     def initialize_schema(self) -> None:
         """
         Initialize the database schema.
@@ -148,7 +149,7 @@ class DatabaseManager:
         """
         if not self._connection:
             raise DatabaseError("Database not connected")
-        
+
         try:
             with self.transaction() as conn:
                 # Create metadata table for schema versioning
@@ -160,7 +161,7 @@ class DatabaseManager:
                         updated_at REAL NOT NULL DEFAULT (julianday('now'))
                     )
                 """)
-                
+
                 # Create secrets table
                 conn.execute("""
                     CREATE TABLE IF NOT EXISTS secrets (
@@ -176,32 +177,32 @@ class DatabaseManager:
                         updated_at REAL NOT NULL DEFAULT (julianday('now'))
                     )
                 """)
-                
+
                 # Create indexes for performance
                 conn.execute("""
                     CREATE INDEX IF NOT EXISTS idx_secrets_name 
                     ON secrets(name)
                 """)
-                
+
                 conn.execute("""
                     CREATE INDEX IF NOT EXISTS idx_secrets_tags 
                     ON secrets(tags)
                 """)
-                
+
                 conn.execute("""
                     CREATE INDEX IF NOT EXISTS idx_secrets_created 
                     ON secrets(created_at)
                 """)
-                
+
                 # Store schema version
                 conn.execute("""
                     INSERT OR REPLACE INTO metadata (key, value, updated_at)
                     VALUES ('schema_version', ?, julianday('now'))
                 """, (str(self.SCHEMA_VERSION),))
-                
+
         except sqlite3.Error as e:
             raise DatabaseError(f"Failed to initialize schema: {e}") from e
-    
+
     def verify_integrity(self) -> bool:
         """
         Verify database integrity.
@@ -214,15 +215,15 @@ class DatabaseManager:
         """
         if not self._connection:
             raise DatabaseError("Database not connected")
-        
+
         try:
             cursor = self._connection.execute("PRAGMA integrity_check")
             result = cursor.fetchone()
             return result and result[0] == "ok"
-            
+
         except sqlite3.Error as e:
             raise DatabaseError(f"Integrity check failed: {e}") from e
-    
+
     def get_schema_version(self) -> int:
         """
         Get the current schema version.
@@ -235,21 +236,21 @@ class DatabaseManager:
         """
         if not self._connection:
             raise DatabaseError("Database not connected")
-        
+
         try:
             cursor = self._connection.execute("""
                 SELECT value FROM metadata WHERE key = 'schema_version'
             """)
             result = cursor.fetchone()
-            
+
             if not result:
                 raise VaultCorruptedError("Schema version not found")
-            
+
             return int(result[0])
-            
+
         except (sqlite3.Error, ValueError) as e:
             raise VaultCorruptedError(f"Invalid schema version: {e}") from e
-    
+
     def create_secret(self, record: SecretRecord) -> None:
         """
         Create a new secret in the database.
@@ -263,7 +264,7 @@ class DatabaseManager:
         """
         if not self._connection:
             raise DatabaseError("Database not connected")
-        
+
         try:
             with self.transaction() as conn:
                 conn.execute("""
@@ -282,14 +283,14 @@ class DatabaseManager:
                     record.created_at,
                     record.updated_at,
                 ))
-                
+
         except sqlite3.IntegrityError as e:
             if "UNIQUE constraint failed" in str(e):
                 raise SecretAlreadyExistsError(f"Secret '{record.name}' already exists")
             raise DatabaseError(f"Failed to create secret: {e}") from e
         except sqlite3.Error as e:
             raise DatabaseError(f"Failed to create secret: {e}") from e
-    
+
     def get_secret(self, name: str) -> SecretRecord:
         """
         Retrieve a secret by name.
@@ -306,25 +307,25 @@ class DatabaseManager:
         """
         if not self._connection:
             raise DatabaseError("Database not connected")
-        
+
         try:
             cursor = self._connection.execute("""
                 SELECT name, description, tags, ciphertext, nonce, tag, salt,
                        created_at, updated_at
                 FROM secrets WHERE name = ?
             """, (name,))
-            
+
             row = cursor.fetchone()
             if not row:
                 raise SecretNotFoundError(f"Secret '{name}' not found")
-            
+
             encrypted_data = EncryptedData(
                 ciphertext=row["ciphertext"],
                 nonce=row["nonce"],
                 tag=row["tag"],
                 salt=row["salt"],
             )
-            
+
             return SecretRecord(
                 name=row["name"],
                 encrypted_value=encrypted_data,
@@ -333,10 +334,10 @@ class DatabaseManager:
                 created_at=row["created_at"],
                 updated_at=row["updated_at"],
             )
-            
+
         except sqlite3.Error as e:
             raise DatabaseError(f"Failed to get secret: {e}") from e
-    
+
     def update_secret(self, record: SecretRecord) -> None:
         """
         Update an existing secret.
@@ -350,7 +351,7 @@ class DatabaseManager:
         """
         if not self._connection:
             raise DatabaseError("Database not connected")
-        
+
         try:
             with self.transaction() as conn:
                 cursor = conn.execute("""
@@ -368,13 +369,13 @@ class DatabaseManager:
                     record.updated_at,
                     record.name,
                 ))
-                
+
                 if cursor.rowcount == 0:
                     raise SecretNotFoundError(f"Secret '{record.name}' not found")
-                    
+
         except sqlite3.Error as e:
             raise DatabaseError(f"Failed to update secret: {e}") from e
-    
+
     def delete_secret(self, name: str) -> None:
         """
         Delete a secret by name.
@@ -388,19 +389,19 @@ class DatabaseManager:
         """
         if not self._connection:
             raise DatabaseError("Database not connected")
-        
+
         try:
             with self.transaction() as conn:
                 cursor = conn.execute("DELETE FROM secrets WHERE name = ?", (name,))
-                
+
                 if cursor.rowcount == 0:
                     raise SecretNotFoundError(f"Secret '{name}' not found")
-                    
+
         except sqlite3.Error as e:
             raise DatabaseError(f"Failed to delete secret: {e}") from e
-    
+
     def list_secrets(
-        self, 
+        self,
         pattern: Union[str, None] = None,
         tags: Union[List[str], None] = None,
         limit: Union[int, None] = None,
@@ -423,7 +424,7 @@ class DatabaseManager:
         """
         if not self._connection:
             raise DatabaseError("Database not connected")
-        
+
         try:
             query = """
                 SELECT name, description, tags, created_at, updated_at
@@ -431,28 +432,28 @@ class DatabaseManager:
                 WHERE 1=1
             """
             params = []
-            
+
             if pattern:
                 query += " AND name LIKE ?"
                 params.append(pattern)
-            
+
             if tags:
                 for tag in tags:
                     query += " AND tags LIKE ?"
                     params.append(f"%{tag}%")
-            
+
             query += " ORDER BY name"
-            
+
             if limit:
                 query += " LIMIT ?"
                 params.append(limit)
-            
+
             if offset:
                 query += " OFFSET ?"
                 params.append(offset)
-            
+
             cursor = self._connection.execute(query, params)
-            
+
             return [
                 {
                     "name": row["name"],
@@ -463,10 +464,10 @@ class DatabaseManager:
                 }
                 for row in cursor.fetchall()
             ]
-            
+
         except sqlite3.Error as e:
             raise DatabaseError(f"Failed to list secrets: {e}") from e
-    
+
     def count_secrets(self) -> int:
         """
         Get the total number of secrets.
@@ -479,15 +480,15 @@ class DatabaseManager:
         """
         if not self._connection:
             raise DatabaseError("Database not connected")
-        
+
         try:
             cursor = self._connection.execute("SELECT COUNT(*) FROM secrets")
             result = cursor.fetchone()
             return result[0] if result else 0
-            
+
         except sqlite3.Error as e:
             raise DatabaseError(f"Failed to count secrets: {e}") from e
-    
+
     def backup_database(self, backup_path: Path) -> None:
         """
         Create a backup of the database.
@@ -500,11 +501,11 @@ class DatabaseManager:
         """
         if not self._connection:
             raise DatabaseError("Database not connected")
-        
+
         try:
             backup_conn = sqlite3.connect(str(backup_path))
             self._connection.backup(backup_conn)
             backup_conn.close()
-            
+
         except sqlite3.Error as e:
             raise DatabaseError(f"Failed to backup database: {e}") from e

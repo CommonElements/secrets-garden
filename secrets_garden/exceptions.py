@@ -5,7 +5,7 @@ from typing import Union
 
 class SecretsGardenError(Exception):
     """Base exception class for all Secret's Garden errors."""
-    
+
     def __init__(self, message: str, details: Union[str, None] = None) -> None:
         super().__init__(message)
         self.message = message

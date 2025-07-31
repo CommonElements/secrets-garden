@@ -7,8 +7,8 @@ including temporary vaults, mock data, and test utilities.
 
 import os
 import tempfile
+from collections.abc import Generator
 from pathlib import Path
-from typing import Generator
 
 import pytest
 
@@ -54,12 +54,12 @@ def unlocked_vault(vault_manager: VaultManager) -> VaultManager:
     test_password = "test-password-123"
     vault_manager.create(test_password, "Test vault")
     vault_manager.unlock(test_password)
-    
+
     # Add some test secrets
     vault_manager.add_secret("api_key", "sk-1234567890", "API key for service", ["api", "prod"])
     vault_manager.add_secret("db_password", "super-secret-password", "Database password", ["db"])
     vault_manager.add_secret("simple_secret", "simple-value", "Simple test secret")
-    
+
     return vault_manager
 
 
@@ -99,7 +99,7 @@ def sample_secrets() -> dict:
 def encrypted_data_samples(crypto_manager: CryptoManager) -> dict:
     """Provide encrypted data samples for testing."""
     password = "test-password"
-    
+
     samples = {
         "simple": "simple value",
         "multiline": "line 1\nline 2\nline 3",
@@ -108,14 +108,14 @@ def encrypted_data_samples(crypto_manager: CryptoManager) -> dict:
         "long_text": "A" * 1000,
         "json_like": '{"key": "value", "number": 123}',
     }
-    
+
     encrypted_samples = {}
     for key, plaintext in samples.items():
         encrypted_samples[key] = {
             "plaintext": plaintext,
             "encrypted": crypto_manager.encrypt(plaintext, password)
         }
-    
+
     return encrypted_samples
 
 
@@ -124,14 +124,14 @@ def clean_environment():
     """Clean environment variables before each test."""
     # Store original environment
     original_env = os.environ.copy()
-    
+
     # Remove any Secret's Garden environment variables
     for key in list(os.environ.keys()):
         if key.startswith("SECRETS_GARDEN_"):
             del os.environ[key]
-    
+
     yield
-    
+
     # Restore original environment
     os.environ.clear()
     os.environ.update(original_env)
@@ -141,18 +141,18 @@ def clean_environment():
 def mock_keyring(monkeypatch):
     """Mock keyring operations for testing."""
     stored_passwords = {}
-    
+
     def mock_get_password(service: str, username: str) -> str | None:
         return stored_passwords.get(f"{service}:{username}")
-    
+
     def mock_set_password(service: str, username: str, password: str) -> None:
         stored_passwords[f"{service}:{username}"] = password
-    
+
     def mock_delete_password(service: str, username: str) -> None:
         key = f"{service}:{username}"
         if key in stored_passwords:
             del stored_passwords[key]
-    
+
     try:
         import keyring
         monkeypatch.setattr(keyring, "get_password", mock_get_password)
@@ -161,7 +161,7 @@ def mock_keyring(monkeypatch):
     except ImportError:
         # keyring not available, skip mocking
         pass
-    
+
     return stored_passwords
 
 
